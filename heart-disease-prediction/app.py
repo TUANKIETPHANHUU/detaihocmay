@@ -22,7 +22,7 @@ def load_model():
     try:
         model = joblib.load(os.path.join(MODEL_DIR, 'stacking_model.pkl'))
         scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.pkl'))
-        selected_features = joblib.load(os.path.join(MODEL_DIR, 'selected_features.pkl'))
+        selected_features = joblib.load(os.path.join(MODEL_DIR, 'models/stacking_model.pkl'))
         return model, scaler, selected_features
     except FileNotFoundError as e:
         st.error(f"❌ Không tìm thấy file model: {e}")
@@ -31,7 +31,7 @@ def load_model():
 @st.cache_data
 def load_data():
     # Nên để file CSV vào thư mục 'data' nằm trong project của bạn
-    DATA_PATH = os.path.join(BASE_DIR, 'data', 'Heart Prediction Quantum Dataset.csv')
+    DATA_PATH = os.path.join(BASE_DIR, 'data', 'D:\stream_lit_DuDoanBenhTim\data\Heart Prediction Quantum Dataset.csv')
     try:
         return pd.read_csv(DATA_PATH)
     except:
