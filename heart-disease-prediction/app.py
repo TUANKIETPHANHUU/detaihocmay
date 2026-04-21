@@ -5,7 +5,7 @@ import joblib
 import os
 import altair as alt
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, precision_score, recall_score, f1_score
 import seaborn as sns
 
 # ===== 1. CẤU HÌNH TRANG =====
@@ -98,7 +98,7 @@ if page == "🏠 Trang 1: Giới thiệu & EDA":
             st.write("**Biểu đồ phân phối nhãn bệnh (HeartDisease):**")
             fig1, ax1 = plt.subplots(figsize=(6, 4))
             sns.countplot(x='HeartDisease', data=df, palette='Set2', ax=ax1)
-            ax1.set_xticklabels(['Không bệnh (0)', 'Có bệnh (1)'])
+            ax1.set_xticklabels(ax1.get_xticklabels(), rotation=0) # Sửa lỗi warning hiển thị nhãn
             st.pyplot(fig1)
             
         with col2:
@@ -111,8 +111,8 @@ if page == "🏠 Trang 1: Giới thiệu & EDA":
             
         st.markdown("""
         ### 📝 Nhận xét dữ liệu:
-        - **Sự cân bằng:** Biểu đồ phân phối cho thấy tỷ lệ giữa nhóm "Có bệnh" và "Không bệnh" trong tập dữ liệu gốc. Nếu có sự chênh lệch lớn, cần áp dụng SMOTE (như đã làm trong bước huấn luyện) để cân bằng.
-        - **Tương quan:** Thông qua ma trận tương quan, ta thấy các chỉ số như `BloodPressure` (Huyết áp) và `Cholesterol` có mức độ tương quan dương tính rõ rệt với khả năng mắc bệnh tim. Đây là những đặc trưng quan trọng quyết định kết quả của mô hình.
+        - **Sự cân bằng:** Biểu đồ phân phối cho thấy tỷ lệ giữa nhóm "Có bệnh" và "Không bệnh" trong tập dữ liệu gốc.
+        - **Tương quan:** Thông qua ma trận tương quan, ta thấy các chỉ số như `BloodPressure` (Huyết áp) và `Cholesterol` có mức độ tương quan nhất định với khả năng mắc bệnh tim.
         """)
     else:
         st.error("Chưa kết nối được với file dữ liệu CSV trong thư mục 'data'.")
@@ -137,7 +137,7 @@ elif page == "🚀 Trang 2: Triển khai mô hình":
             with col2:
                 chol = st.number_input("Chỉ số Cholesterol", min_value=100, max_value=600, value=200)
                 hr = st.number_input("Nhịp tim (HeartRate)", min_value=40, max_value=220, value=75)
-                qpf = st.slider("Chỉ số Quantum Pattern (QPF)", 0.0, 1.0, 0.5)
+                qpf = st.number_input("Chỉ số Quantum Pattern (QPF)", min_value=0.0, max_value=50.0, value=8.5, step=0.1)
                 
             submit_btn = st.form_submit_button("🔍 Tiến hành dự đoán")
             
@@ -168,20 +168,29 @@ elif page == "🚀 Trang 2: Triển khai mô hình":
                 3: ("Nguy cơ Nặng (Cần can thiệp y tế ngay)", "🔴")
             }
             
-            result_text, icon = labels_map[prediction]
+            # Xử lý trường hợp mô hình chỉ có 2 nhãn (0 và 1) hoặc nhiều nhãn
+            if prediction in labels_map:
+                result_text, icon = labels_map[prediction]
+            else:
+                result_text, icon = (f"Phân lớp {prediction}", "🔔")
+                
             st.markdown(f"### {icon} Cấp độ dự báo: **{result_text}**")
+            
+            # Tạo DataFrame cho biểu đồ xác suất dựa trên số lượng class thực tế của mô hình
+            num_classes = len(probabilities)
+            class_names = [labels_map[i][0] if i in labels_map else f"Class {i}" for i in range(num_classes)]
             
             st.write("**Độ tin cậy (Xác suất cho từng cấp độ):**")
             prob_df = pd.DataFrame({
-                "Cấp độ bệnh": ["Không bệnh", "Nhẹ", "Trung bình", "Nặng"],
+                "Trạng thái": class_names,
                 "Xác suất (%)": np.round(probabilities * 100, 2)
             })
             
             chart = alt.Chart(prob_df).mark_bar().encode(
                 x='Xác suất (%):Q',
-                y=alt.Y('Cấp độ bệnh:N', sort=None),
-                color='Cấp độ bệnh:N',
-                tooltip=['Cấp độ bệnh', 'Xác suất (%)']
+                y=alt.Y('Trạng thái:N', sort=None),
+                color='Trạng thái:N',
+                tooltip=['Trạng thái', 'Xác suất (%)']
             ).properties(height=250)
             
             st.altair_chart(chart, use_container_width=True)
@@ -192,41 +201,69 @@ elif page == "🚀 Trang 2: Triển khai mô hình":
 elif page == "📈 Trang 3: Đánh giá & Hiệu năng":
     st.title("📈 Đánh giá & Hiệu năng (Evaluation)")
     
-    st.markdown("""
-    Để chứng minh tính đáng tin cậy của mô hình **Stacking Classifier**, dưới đây là các chỉ số đo lường hiệu năng đạt được trong quá trình kiểm thử (Testing).
-    """)
-    
-    # Giả lập các chỉ số đánh giá (Do tập Test thật nằm trong file train_model.py)
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Accuracy", "94.5%")
-    col2.metric("F1-Score (Macro)", "0.93")
-    col3.metric("Precision", "0.95")
-    col4.metric("Recall", "0.92")
-    
-    st.divider()
-    
-    col_cm, col_text = st.columns([1, 1])
-    with col_cm:
-        st.subheader("📊 Ma trận nhầm lẫn (Confusion Matrix)")
-        # Tạo Confusion matrix mô phỏng (visualization) cho 4 class
-        mock_cm = np.array([[142, 5, 2, 0], [8, 135, 10, 1], [3, 12, 128, 9], [0, 2, 7, 130]])
-        fig_cm, ax_cm = plt.subplots(figsize=(5, 4))
-        sns.heatmap(mock_cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm,
-                    xticklabels=['0', '1', '2', '3'], yticklabels=['0', '1', '2', '3'])
-        ax_cm.set_ylabel('Nhãn thực tế')
-        ax_cm.set_xlabel('Nhãn dự đoán')
-        st.pyplot(fig_cm)
-        
-    with col_text:
-        st.subheader("🔍 Phân tích sai số (Error Analysis)")
+    if model is None or df.empty or 'HeartDisease' not in df.columns:
+        st.warning("⚠️ Không thể đánh giá. Vui lòng đảm bảo mô hình đã được tải và file dữ liệu có cột 'HeartDisease'.")
+    else:
         st.markdown("""
-        Dựa vào quá trình huấn luyện và Ma trận nhầm lẫn bên cạnh, ta có thể rút ra một số nhận định:
-        
-        **1. Trường hợp mô hình hay dự đoán sai:**
-        - Mô hình hoạt động rất tốt ở việc phân biệt giữa người **Không bệnh (0)** và nhóm **Nặng (3)**.
-        - Tuy nhiên, mô hình đôi khi bị nhầm lẫn giữa mức độ **Nhẹ (1)** và **Trung bình (2)** (vd: dự đoán nhầm 12 ca thực tế là 2 thành 1). Lý do là vì ranh giới của các chỉ số sinh học (như mức huyết áp, cholesterol) giữa 2 giai đoạn này khá mờ nhạt và chênh lệch không nhiều.
-        
-        **2. Hướng cải thiện trong tương lai:**
-        - **Bổ sung dữ liệu:** Cần thu thập thêm các đặc trưng chuyên sâu hơn (như tiền sử gia đình, chỉ số đường huyết, thói quen hút thuốc/rượu bia).
-        - **Tối ưu hóa mô hình:** Thử nghiệm tinh chỉnh siêu tham số (Hyperparameter tuning) sâu hơn cho các mô hình nền `LightGBM` và `CatBoost`.
+        Dưới đây là các chỉ số hiệu năng được **tính toán trực tiếp** bằng cách cho mô hình dự đoán lại trên toàn bộ tập dữ liệu đã thu thập.
         """)
+        
+        with st.spinner("Đang tính toán các chỉ số thực tế..."):
+            # Lấy X và y từ tập dữ liệu
+            X_eval = df.drop(columns=['HeartDisease'])
+            y_eval = df['HeartDisease']
+            
+            # Tiền xử lý dữ liệu giống như lúc train
+            X_eval_processed = process_input(X_eval)
+            
+            # Lọc các cột đã được features selection
+            # Xử lý lỗi nếu trong file CSV tên cột không khớp hoàn toàn
+            missing_cols = [col for col in selected_features if col not in X_eval_processed.columns]
+            if missing_cols:
+                st.error(f"Lỗi: Thiếu các cột sau trong tập dữ liệu để đánh giá: {missing_cols}")
+            else:
+                X_eval_final = X_eval_processed[selected_features]
+                X_eval_scaled = scaler.transform(X_eval_final)
+                
+                # Dự đoán
+                y_pred = model.predict(X_eval_scaled)
+                
+                # Tính toán các metric thật
+                acc = accuracy_score(y_eval, y_pred)
+                # Dùng average='weighted' để hỗ trợ cả bài toán nhị phân (Binary) và đa lớp (Multiclass)
+                prec = precision_score(y_eval, y_pred, average='weighted', zero_division=0)
+                rec = recall_score(y_eval, y_pred, average='weighted', zero_division=0)
+                f1 = f1_score(y_eval, y_pred, average='weighted', zero_division=0)
+                
+                # Hiển thị Metric
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Accuracy (Độ chính xác)", f"{acc*100:.2f}%")
+                col2.metric("F1-Score (Trọng số)", f"{f1:.4f}")
+                col3.metric("Precision", f"{prec:.4f}")
+                col4.metric("Recall", f"{rec:.4f}")
+                
+                st.divider()
+                
+                col_cm, col_text = st.columns([1.2, 1])
+                with col_cm:
+                    st.subheader("📊 Ma trận nhầm lẫn (Confusion Matrix) Thực tế")
+                    # Vẽ Confusion Matrix thật
+                    real_cm = confusion_matrix(y_eval, y_pred)
+                    fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
+                    sns.heatmap(real_cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm)
+                    ax_cm.set_ylabel('Nhãn Thực Tế (True Label)')
+                    ax_cm.set_xlabel('Nhãn Dự Đoán (Predicted Label)')
+                    st.pyplot(fig_cm)
+                    
+                with col_text:
+                    st.subheader("🔍 Phân tích sơ bộ")
+                    st.markdown(f"""
+                    **Dựa trên Ma trận nhầm lẫn thực tế của tập dữ liệu hiện tại:**
+                    
+                    - **Tổng số mẫu đã đánh giá:** {len(y_eval)} mẫu.
+                    - Mô hình đạt độ chính xác tổng thể là **{acc*100:.2f}%**, cho thấy sự ổn định của phương pháp học máy kết hợp (Stacking).
+                    - Các ô nằm trên **đường chéo chính** (từ góc trên trái xuống góc dưới phải) thể hiện số lượng ca dự đoán ĐÚNG.
+                    - Các ô nằm **ngoài đường chéo chính** là những trường hợp dự đoán SAI (Dương tính giả hoặc Âm tính giả).
+                    
+                    *(Lưu ý: Kết quả trên được tính toán trên toàn bộ tập dữ liệu hiện có trong ứng dụng. Trong thực tế triển khai, mô hình nên được đánh giá trên một tập kiểm thử - Test set hoàn toàn độc lập để đánh giá độ tổng quát).*
+                    """)
