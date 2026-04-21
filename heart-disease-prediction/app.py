@@ -20,9 +20,9 @@ def load_model():
     # Sửa từ 'Model' thành 'models' theo đúng ảnh bạn gửi
     MODEL_DIR = os.path.join(BASE_DIR, 'models') 
     try:
-        model = joblib.load(os.path.join(MODEL_DIR, 'stacking_model.pkl'))
-        scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.pkl'))
-        selected_features = joblib.load(os.path.join(MODEL_DIR, 'models/stacking_model.pkl'))
+        model = joblib.load(os.path.join(MODEL_DIR, 'D:\stream_lit_DuDoanBenhTim\models\stacking_model.pkl'))
+        scaler = joblib.load(os.path.join(MODEL_DIR, 'D:\stream_lit_DuDoanBenhTim\models\scaler.pkl'))
+        selected_features = joblib.load(os.path.join(MODEL_DIR, 'D:\stream_lit_DuDoanBenhTim\models\selected_features.pkl'))
         return model, scaler, selected_features
     except FileNotFoundError as e:
         st.error(f"❌ Không tìm thấy file model: {e}")
